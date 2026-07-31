@@ -1,0 +1,16 @@
+[package]
+name = "backtrader-rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+csv = "1.3"
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+log = "0.4"
+
+[dev-dependencies]
+criterion = "0.5"
+env_logger = "0.11"
