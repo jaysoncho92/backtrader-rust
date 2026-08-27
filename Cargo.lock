@@ -91,6 +91,7 @@ dependencies = [
  "csv",
  "env_logger",
  "log",
+ "rayon",
  "serde",
  "serde_json",
  "thiserror 1.0.69",

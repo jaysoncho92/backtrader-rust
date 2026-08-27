@@ -67,6 +67,8 @@ impl<T> Index<isize> for TimeSeries<T> {
         let len = self.data.len() as isize;
         assert!(!self.data.is_empty(), "TimeSeries 为空，无法索引");
         assert!(index <= 0, "TimeSeries 索引必须 <= 0，收到 {}", index);
+        // 修复: 添加下界检查，避免 len=3 时 ts[-3] 因 usize 溢出导致不可预测的 panic
+        assert!(index >= -(len - 1), "TimeSeries 索引越界: len={}, index={}", len, index);
         let real_idx = (len - 1 + index) as usize;
         &self.data[real_idx]
     }
@@ -146,5 +148,43 @@ mod tests {
         assert_eq!(ts.get(0), Some(&200.0));
         assert_eq!(ts.get(1), Some(&100.0));
         assert_eq!(ts.get(2), None);
+    }
+
+    // ========== 修复 #1: TimeSeries 负索引越界 panic 测试 ==========
+
+    #[test]
+    #[should_panic(expected = "TimeSeries 索引越界")]
+    fn test_timeseries_index_out_of_bounds_negative() {
+        // len=3 时，ts[-3] 应触发清晰的 panic 消息
+        let mut ts = TimeSeries::new();
+        ts.push(10.0);
+        ts.push(20.0);
+        ts.push(30.0);
+        let _ = ts[-3isize]; // len=3, 最大允许 -(3-1) = -2, -3 越界
+    }
+
+    #[test]
+    #[should_panic(expected = "TimeSeries 索引越界")]
+    fn test_timeseries_index_far_out_of_bounds() {
+        // len=2 时访问 ts[-5] 应触发越界 panic，而不是 usize 溢出
+        let mut ts = TimeSeries::new();
+        ts.push(1.0);
+        ts.push(2.0);
+        let _ = ts[-5isize];
+    }
+
+    #[test]
+    #[should_panic(expected = "TimeSeries 为空")]
+    fn test_timeseries_index_empty() {
+        let ts: TimeSeries<f64> = TimeSeries::new();
+        let _ = ts[0isize];
+    }
+
+    #[test]
+    #[should_panic(expected = "TimeSeries 索引必须 <= 0")]
+    fn test_timeseries_index_positive() {
+        let mut ts = TimeSeries::new();
+        ts.push(10.0);
+        let _ = ts[1isize];
     }
 }

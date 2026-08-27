@@ -2,7 +2,7 @@
 /// 使用 SMA(10) 和 SMA(30) 的金叉/死叉信号进行交易
 
 use backtrader_rust::engine::CerebroBuilder;
-use backtrader_rust::feeds::CsvFeed;
+use backtrader_rust::feeds::{CsvFeed, DataFeed};
 use backtrader_rust::indicators::{Indicator, SMA};
 use backtrader_rust::strategy::{Context, Strategy};
 
@@ -39,13 +39,15 @@ impl Strategy for SmaCrossStrategy {
     }
 
     fn next(&mut self, ctx: &mut Context) {
+        // 先提取需要的值，避免长期持有不可变借用
         let data = ctx.data(0);
         if data.is_empty() {
             return;
         }
-
-        let bar = &data[0isize]; // 最新 bar
+        let bar = &data[0isize];
         let close = bar.close;
+        let datetime = bar.datetime;
+        let current_bar = ctx.current_bar;
 
         // 更新指标
         let fast_val = self.fast_sma.as_mut().unwrap().next(close);
@@ -56,26 +58,25 @@ impl Strategy for SmaCrossStrategy {
             return;
         };
 
-        let pos = ctx.position(0);
+        let pos_size = ctx.position(0).size;
+        let pos_open = pos_size != 0;
 
         // 金叉：fast 上穿 slow，且无持仓 -> 买入
         if let (Some(prev_f), Some(prev_s)) = (self.prev_fast, self.prev_slow) {
-            if prev_f <= prev_s && fast > slow && !pos.is_open() {
-                // 计算可买数量：用 95% 的可用现金
+            if prev_f <= prev_s && fast > slow && !pos_open {
                 let cash_available = ctx.cash() * 0.95;
                 let size = (cash_available / close) as i64;
                 if size > 0 {
                     ctx.buy(0, size);
                     println!("[买入] bar={} dt={} close={:.2} fast={:.2} slow={:.2} size={}",
-                             ctx.current_bar, bar.datetime, close, fast, slow, size);
+                             current_bar, datetime, close, fast, slow, size);
                 }
             }
             // 死叉：fast 下穿 slow，且有持仓 -> 卖出
-            else if prev_f >= prev_s && fast < slow && pos.is_open() {
-                let sell_size = pos.size;
-                ctx.sell(0, sell_size);
+            else if prev_f >= prev_s && fast < slow && pos_open {
+                ctx.sell(0, pos_size);
                 println!("[卖出] bar={} dt={} close={:.2} fast={:.2} slow={:.2} size={}",
-                         ctx.current_bar, bar.datetime, close, fast, slow, sell_size);
+                         current_bar, datetime, close, fast, slow, pos_size);
             }
         }
 

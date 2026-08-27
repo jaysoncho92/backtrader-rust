@@ -45,6 +45,13 @@ pub struct Order {
     pub executed_price: f64,
     pub executed_size: i64,
     pub commission: f64,
+    /// OCO（One-Cancels-Other）分组 ID
+    /// 同一 oco_group 中的一个订单成交时，取消组内所有其他订单
+    pub oco_group: Option<u64>,
+    /// 是否已被 Stop 单触发（StopLimit 单专用，触发后转为 Limit 单逻辑）
+    pub triggered: bool,
+    /// 是否为 Bracket 订单的附属单（止盈/止损单），值为父订单 ID
+    pub parent_id: Option<u64>,
 }
 
 impl Order {
@@ -64,6 +71,9 @@ impl Order {
             executed_price: 0.0,
             executed_size: 0,
             commission: 0.0,
+            oco_group: None,
+            triggered: false,
+            parent_id: None,
         }
     }
 
@@ -83,6 +93,61 @@ impl Order {
             executed_price: 0.0,
             executed_size: 0,
             commission: 0.0,
+            oco_group: None,
+            triggered: false,
+            parent_id: None,
+        }
+    }
+
+    /// 创建止损单（Stop 单）
+    /// 当价格达到 stop_price 时，转为市价单以 open 价执行
+    pub fn new_stop(id: u64, side: OrderSide, size: i64, stop_price: f64) -> Self {
+        Self {
+            id,
+            order_type: OrderType::Stop,
+            side,
+            size,
+            price: None,
+            limit_price: None,
+            stop_price: Some(stop_price),
+            status: OrderStatus::Created,
+            created_dt: None,
+            executed_dt: None,
+            executed_price: 0.0,
+            executed_size: 0,
+            commission: 0.0,
+            oco_group: None,
+            triggered: false,
+            parent_id: None,
+        }
+    }
+
+    /// 创建止损限价单（StopLimit 单）
+    /// 当价格达到 stop_price 时触发，转为限价单以 limit_price 执行
+    pub fn new_stop_limit(
+        id: u64,
+        side: OrderSide,
+        size: i64,
+        stop_price: f64,
+        limit_price: f64,
+    ) -> Self {
+        Self {
+            id,
+            order_type: OrderType::StopLimit,
+            side,
+            size,
+            price: Some(limit_price), // 触发后作为限价价格
+            limit_price: Some(limit_price),
+            stop_price: Some(stop_price),
+            status: OrderStatus::Created,
+            created_dt: None,
+            executed_dt: None,
+            executed_price: 0.0,
+            executed_size: 0,
+            commission: 0.0,
+            oco_group: None,
+            triggered: false,
+            parent_id: None,
         }
     }
 
@@ -127,5 +192,17 @@ impl Order {
             self.status,
             OrderStatus::Created | OrderStatus::Submitted | OrderStatus::Accepted
         )
+    }
+
+    /// 设置 OCO 分组
+    pub fn with_oco_group(mut self, group_id: u64) -> Self {
+        self.oco_group = Some(group_id);
+        self
+    }
+
+    /// 设置父订单（用于 Bracket 订单的附属单）
+    pub fn with_parent(mut self, parent_id: u64) -> Self {
+        self.parent_id = Some(parent_id);
+        self
     }
 }

@@ -1,1 +1,18 @@
-/target  
+# Rust 构建产物
+/target/
+
+# Python 基准测试临时文件（如有）
+__pycache__/
+*.pyc
+bench/
+
+# IDE
+.idea/
+.vscode/
+
+# 临时文件
+*.tmp
+.commit_msg.txt
+
+# 大型基准数据文件（如存在）
+sample_data/bench_*.csv
